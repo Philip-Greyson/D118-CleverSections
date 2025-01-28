@@ -30,6 +30,8 @@ print(f'SFTP Username: {SFTP_UN} | SFTP Password: {SFTP_PW} | SFTP Server: {SFTP
 
 VALID_SUBJECTS = ['English/language arts', 'Math', 'Science', 'Social studies', 'Language', 'Homeroom/advisory', 'Interventions/online learning', 'Technology and engineering', 'PE and health', 'Arts and music', 'other']  # the supported values of course subjects from the Clever documentation
 SUBJECT_MAP = {'Eng': 'English/language arts', 'Mat': 'Math', 'Gls' : 'Social studies', 'Gov': 'Social studies', 'Uhi': 'Social studies', 'Pe': 'PE and health', 'Sci': 'Science', 'Hlt': 'PE and health', 'Social Studies': 'Social studies', 'Socialstudies': 'Social studies'}
+STRIP_TRACK_INFO = True  # whether we should strip the (A) track info from the expression for the period output field
+
 
 if __name__ == '__main__':  # main file execution
     with open('sections_log.txt', 'w') as log:
@@ -100,11 +102,12 @@ if __name__ == '__main__':  # main file execution
                                                     # print(section)
                                                     # print(section, file=log)
 
-                                                    # fix the period expression so we dont have the track info since we only have one track at the moment
-                                                    if period:  # if there was a period returned
-                                                        period = period.split('(')[0]  # remove the (A) track info from the expression so its just the period number
-                                                    else:
-                                                        period = ''
+                                                    if STRIP_TRACK_INFO:  # fix the period expression so we dont have the track info since we only have one track at the moment
+                                                        if period:  # if there was a period returned
+                                                            period = period.split('(')[0]  # remove the (A) track info from the expression so its just the period number
+                                                        else:
+                                                            period = ''
+
                                                     # do some fixing of grade levels to change it to what Clever expects
                                                     if gradeLevel:
                                                         if gradeLevel < 0:
