@@ -109,7 +109,7 @@ if __name__ == '__main__':  # main file execution
                                                     if gradeLevel:
                                                         if gradeLevel < 0:
                                                             gradeLevel = "Preschool"
-                                                        elif gradeLevel > 12 or (gradeLevel > 10 and schoolID != 5):  # if their grade does not make sense, its probably meant to be a range and just doesnt have a hypen in it, fix that
+                                                        elif gradeLevel > 12 or (gradeLevel > 9 and schoolID != 5):  # if their grade does not make sense, its probably meant to be a range and just doesnt have a hypen in it, fix that
                                                             gradeLevel = str(gradeLevel)  # convert the integer to a string
                                                             gradeLevel = gradeLevel[0] + "-" + gradeLevel[len(gradeLevel)-1]  # take the first character and last character and put a hyphen between them
                                                     else:
@@ -167,7 +167,7 @@ if __name__ == '__main__':  # main file execution
                 print(f'INFO: SFTP connection to Clever at {SFTP_HOST} successfully established', file=log)
                 # print(sftp.pwd) # debug, show what folder we connected to
                 # print(sftp.listdir())  # debug, show what other files/folders are in the current directory
-                # sftp.put(OUTPUT_FILE_NAME)  # upload the file onto the sftp server
+                sftp.put(OUTPUT_FILE_NAME)  # upload the file onto the sftp server
                 print("INFO: Sections sync file placed on remote server")
                 print("INFO: Sections sync file placed on remote server", file=log)
         except Exception as er:
