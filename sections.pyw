@@ -31,7 +31,9 @@ print(f'SFTP Username: {SFTP_UN} | SFTP Password: {SFTP_PW} | SFTP Server: {SFTP
 VALID_SUBJECTS = ['English/language arts', 'Math', 'Science', 'Social studies', 'Language', 'Homeroom/advisory', 'Interventions/online learning', 'Technology and engineering', 'PE and health', 'Arts and music', 'other']  # the supported values of course subjects from the Clever documentation
 SUBJECT_MAP = {'Eng': 'English/language arts', 'Mat': 'Math', 'Gls' : 'Social studies', 'Gov': 'Social studies', 'Uhi': 'Social studies', 'Pe': 'PE and health', 'Sci': 'Science', 'Hlt': 'PE and health', 'Social Studies': 'Social studies', 'Socialstudies': 'Social studies'}
 STRIP_TRACK_INFO = True  # whether we should strip the (A) track info from the expression for the period output field
-
+IGNORE_ZERO_ENROLLMENT_SECTIONS = True  # whether we should skip outputting sections that have no enrollments
+IGNORE_TEACHERS_WITHOUT_EMAILS = True  # whether we should stip including teacherids that have no emails in their account (usually placeholder accounts)
+IGNORE_SECTIONS_WITH_NO_TEACHERS = True  # whether we should skip outputting sections that have no teachers (because of the above ignoring of teachers without emails)
 
 if __name__ == '__main__':  # main file execution
     with open('sections_log.txt', 'w') as log:
@@ -92,6 +94,8 @@ if __name__ == '__main__':  # main file execution
                                             sections = cur.fetchall()
                                             for section in sections:
                                                 try:
+                                                    sectionHasEnrollments = True  # set this flag to true by default for each section
+                                                    sectionHasTeachers = True  # set this flag to true by default for each section
                                                     sectionID = int(section[0])
                                                     sectionNum = str(section[1]) if section[1] else ''
                                                     courseNum = str(section[2]) if section[2] else ''
@@ -125,18 +129,42 @@ if __name__ == '__main__':  # main file execution
                                                     else:
                                                         courseType = ''  # if there was no course type returned from PS, just set it to a blank
 
+                                                    if IGNORE_ZERO_ENROLLMENT_SECTIONS:  # find the number of enrolled students per section if we want to ignore those with none
+                                                        try:
+                                                            cur.execute('SELECT studentid FROM cc WHERE sectionid = :section AND termid = :term AND schoolid = :school', section=sectionID, term=termID, school=schoolID)
+                                                            enrollments = cur.fetchall()
+                                                            # print(enrollments)  # debug
+                                                            if len(enrollments) < 1:
+                                                                print(f'DBUG: Section ID {sectionID} has {len(enrollments)} students enrolled, skipping')
+                                                                print(f'DBUG: Section ID {sectionID} has {len(enrollments)} students enrolled, skipping', file=log)
+                                                                sectionHasEnrollments = False
+                                                        except Exception as er:
+                                                            print(f'ERROR while finding number of enrollments for section ID {sectionID}: {er}')
+                                                            print(f'ERROR while finding number of enrollments for section ID {sectionID}: {er}', file=log)
+
                                                     # for each section we find, we also need to find the teacher and any co-teachers or support staff that are in the section
                                                     try:
                                                         sectionTeachers = []  # create a new empty list each time to store the teachers info in
-                                                        cur.execute('SELECT teachers.users_dcid, teachers.first_name, teachers.last_name, roledef.name FROM sectionteacher LEFT JOIN teachers ON sectionteacher.teacherid = teachers.id LEFT JOIN roledef ON sectionteacher.roleid = roledef.id WHERE sectionteacher.sectionid = :section', section=sectionID)
+                                                        cur.execute('SELECT teachers.users_dcid, teachers.email_addr, teachers.first_name, teachers.last_name, roledef.name FROM sectionteacher LEFT JOIN teachers ON sectionteacher.teacherid = teachers.id LEFT JOIN roledef ON sectionteacher.roleid = roledef.id WHERE sectionteacher.sectionid = :section', section=sectionID)
                                                         teachers = cur.fetchall()
                                                         for teacher in teachers:
                                                             # print(teacher, file=log)  # debug
-                                                            sectionTeachers.append(teacher[0])  # append their DCID, which is really the only info we need
+                                                            if IGNORE_TEACHERS_WITHOUT_EMAILS:
+                                                                if teacher[1] is not None:
+                                                                    sectionTeachers.append(teacher[0])  # append their DCID, which is really the only info we need
+                                                                else:
+                                                                    print(f'DBUG: Teacher with DCID {teacher[0]} in section ID {sectionID} does not have an email, they will be skipped')
+                                                                    print(f'DBUG: Teacher with DCID {teacher[0]} in section ID {sectionID} does not have an email, they will be skipped', file=log)
+                                                            else:
+                                                                sectionTeachers.append(teacher[0])  # append their DCID, which is really the only info we need
                                                         if len(sectionTeachers) > 10:  # if the number of staff in the sections is above 10, throw an error since the max Clever supports is 10
                                                             print(f'ERROR: More than 10 teachers which is the maximum supported by Clever for section ID {sectionID}, course name {courseName}')
                                                             print(f'ERROR: More than 10 teachers which is the maximum supported by Clever for section ID {sectionID}, course name {courseName}', file=log)
                                                         else:  # fill in the list so there are always 10 entries. probably a better way to do this but it works
+                                                            if len(sectionTeachers) == 0:  # if we have no entries because the teachers do not have emails
+                                                                sectionHasTeachers = False
+                                                                print(f'DBUG: Section ID {sectionID} has no valid teachers, output will be skipped if IGNORE_SECTIONS_WITH_NO_TEACHERS is true')
+                                                                print(f'DBUG: Section ID {sectionID} has no valid teachers, output will be skipped if IGNORE_SECTIONS_WITH_NO_TEACHERS is true', file=log)
                                                             for i in range(len(sectionTeachers),10):  # get an iterable starting at the length of the array and going through 9. This will fill in blanks for the list to fill it up to 10 entries
                                                                 sectionTeachers.append('')  # append a blank entry in the section teachers list
                                                         # print(sectionTeachers, file=log)  # debug
@@ -145,8 +173,10 @@ if __name__ == '__main__':  # main file execution
                                                         print(f'ERROR while getting teachers for section with ID {sectionID}: {er}')
                                                         print(f'ERROR while getting teachers for section with ID {sectionID}: {er}', file=log)
                                                     # do final output of section info to output file
-                                                    # print(f'{schoolID},{sectionID},{sectionTeachers[0]},{sectionTeachers[1]},{sectionTeachers[2]},{sectionTeachers[3]},{sectionTeachers[4]},{sectionTeachers[5]},{sectionTeachers[6]},{sectionTeachers[7]},{sectionTeachers[8]},{sectionTeachers[9]},{courseName},{courseNum},{sectionNum},{period},{courseType},{termStart},{termEnd},{termName}')
-                                                    print(f'{schoolID},{sectionID},{sectionTeachers[0]},{sectionTeachers[1]},{sectionTeachers[2]},{sectionTeachers[3]},{sectionTeachers[4]},{sectionTeachers[5]},{sectionTeachers[6]},{sectionTeachers[7]},{sectionTeachers[8]},{sectionTeachers[9]},{courseName},{courseNum},{sectionNum},{period},{courseType},{gradeLevel},{termStart},{termEnd},{termName}', file=output)
+                                                    if not IGNORE_ZERO_ENROLLMENT_SECTIONS or sectionHasEnrollments:  # only output the section if it has enrollments or if we arent ignoring the zero enrollment sections
+                                                        if not IGNORE_SECTIONS_WITH_NO_TEACHERS or sectionHasTeachers:  # only output the section if it has teachers or we arent ignoring the zero teacher sections
+                                                            # print(f'{schoolID},{sectionID},{sectionTeachers[0]},{sectionTeachers[1]},{sectionTeachers[2]},{sectionTeachers[3]},{sectionTeachers[4]},{sectionTeachers[5]},{sectionTeachers[6]},{sectionTeachers[7]},{sectionTeachers[8]},{sectionTeachers[9]},{courseName},{courseNum},{sectionNum},{period},{courseType},{termStart},{termEnd},{termName}')
+                                                            print(f'{schoolID},{sectionID},{sectionTeachers[0]},{sectionTeachers[1]},{sectionTeachers[2]},{sectionTeachers[3]},{sectionTeachers[4]},{sectionTeachers[5]},{sectionTeachers[6]},{sectionTeachers[7]},{sectionTeachers[8]},{sectionTeachers[9]},{courseName},{courseNum},{sectionNum},{period},{courseType},{gradeLevel},{termStart},{termEnd},{termName}', file=output)
                                                 except Exception as er:
                                                     print(f'Error while processing general section info for section ID {sectionID} in building {schoolID}: {er}')
                                                     print(f'Error while processing general section info for section ID {sectionID} in building {schoolID}: {er}', file=log)
