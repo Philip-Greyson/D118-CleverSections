@@ -145,7 +145,7 @@ if __name__ == '__main__':  # main file execution
                                                     # for each section we find, we also need to find the teacher and any co-teachers or support staff that are in the section
                                                     try:
                                                         sectionTeachers = []  # create a new empty list each time to store the teachers info in
-                                                        cur.execute('SELECT teachers.users_dcid, teachers.email_addr, teachers.first_name, teachers.last_name, roledef.name FROM sectionteacher LEFT JOIN teachers ON sectionteacher.teacherid = teachers.id LEFT JOIN roledef ON sectionteacher.roleid = roledef.id WHERE sectionteacher.sectionid = :section', section=sectionID)
+                                                        cur.execute('SELECT teachers.users_dcid, teachers.email_addr, teachers.first_name, teachers.last_name, roledef.name FROM sectionteacher LEFT JOIN teachers ON sectionteacher.teacherid = teachers.id LEFT JOIN roledef ON sectionteacher.roleid = roledef.id WHERE sectionteacher.sectionid = :section ORDER BY sectionteacher.roleid', section=sectionID)
                                                         teachers = cur.fetchall()
                                                         for teacher in teachers:
                                                             # print(teacher, file=log)  # debug
