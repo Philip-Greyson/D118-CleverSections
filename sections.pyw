@@ -8,7 +8,7 @@ Needs oracledb: pip install oracledb
 
 # importing modules
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import oracledb
 import pysftp
@@ -32,8 +32,9 @@ VALID_SUBJECTS = ['English/language arts', 'Math', 'Science', 'Social studies', 
 SUBJECT_MAP = {'Eng': 'English/language arts', 'Mat': 'Math', 'Gls' : 'Social studies', 'Gov': 'Social studies', 'Uhi': 'Social studies', 'Pe': 'PE and health', 'Sci': 'Science', 'Hlt': 'PE and health', 'Social Studies': 'Social studies', 'Socialstudies': 'Social studies'}
 STRIP_TRACK_INFO = True  # whether we should strip the (A) track info from the expression for the period output field
 IGNORE_ZERO_ENROLLMENT_SECTIONS = True  # whether we should skip outputting sections that have no enrollments
-IGNORE_TEACHERS_WITHOUT_EMAILS = True  # whether we should stip including teacherids that have no emails in their account (usually placeholder accounts)
+IGNORE_TEACHERS_WITHOUT_EMAILS = True  # whether we should skip including teacherids that have no emails in their account (usually placeholder accounts)
 IGNORE_SECTIONS_WITH_NO_TEACHERS = True  # whether we should skip outputting sections that have no teachers (because of the above ignoring of teachers without emails)
+TERM_START_OFFSET_DAYS = 21  # how many days to subtract from the start of the term so that the script runs in advance of the actual term starting
 
 if __name__ == '__main__':  # main file execution
     with open('sections_log.txt', 'w') as log:
@@ -63,7 +64,7 @@ if __name__ == '__main__':  # main file execution
                             cur.execute('SELECT firstday, lastday, yearid FROM terms WHERE schoolid = :school AND isyearrec = 1', school=schoolID)  # search for only year terms to narrow our list
                             years = cur.fetchall()
                             for year in years:
-                                if (year[0] < today) and (year[1] > today):
+                                if ((year[0] - timedelta(days=TERM_START_OFFSET_DAYS)) < today) and (year[1] > today):
                                     yearID = year[2]  # store that terms yearcode into yearID so we can use it to search for all terms this year
                                     print(f'DBUG: Found current year code for school {schoolID} to be {yearID}')
                                     print(f'DBUG: Found current year code for school {schoolID} to be {yearID}', file=log)
